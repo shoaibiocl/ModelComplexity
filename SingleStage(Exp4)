@@ -1,0 +1,76 @@
+import salabim as sim
+import pandas as pd
+import numpy as np
+import greenlet
+import time
+import datetime
+import scipy.stats as stats
+
+
+class Arrival(sim.Component):
+    global env
+
+    def process(self):
+        while True:
+            time = env.now()% (8*4*60)
+            if (0 <= time < 8*60):
+                yield self.hold(sim.Uniform(8,12).sample())
+                Service()
+            elif (8*60 <= time < 16*60):
+                yield self.hold(sim.Normal(10, 1).sample())
+                Service()
+            elif (16*60 <= time < 24*60):
+                yield self.hold(sim.Normal(10, 1).sample())
+                Service()
+            elif (24*60 <= time < 32*60):
+                yield self.hold(8+sim.Beta(4,4).sample()*4)
+                Service()
+
+class Service(sim.Component):
+
+    global server
+    global queue
+
+    def process(self):
+        self.enter(queue)
+        yield self.request(server)
+        self.leave(queue)
+        yield self.hold(sim.Exponential(5).sample())
+        self.release(server)
+
+
+
+def main():
+    global server
+    global queue
+    global util
+    global env
+    util = []
+    global runTime
+    runTime = []
+
+    for i in range(0, 30):
+        env = sim.Environment(trace=False, random_seed="", time_unit="minutes", yieldless=False)
+        server = sim.Resource()
+        queue = sim.Queue()
+        Arrival()
+        start_time = time.time()
+        runtime = 50000
+        env.run(runtime)
+        end_time = time.time()
+        util.append(server.occupancy.mean())
+        runTime.append(end_time - start_time)
+        print("Replication completed: ",i)
+
+    df = pd.DataFrame({
+        'Server utilisation': util,
+        'Run time': runTime})
+
+    # Write the DataFrame to an Excel file
+    excel_file_path = '.venv/Experiment4.xlsx'
+    df.to_excel(excel_file_path, index=False)
+
+
+if __name__ == '__main__':
+    sim.yieldless(False)
+    main()
