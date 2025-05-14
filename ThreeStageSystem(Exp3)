@@ -1,0 +1,120 @@
+import salabim as sim
+import pandas as pd
+import numpy as np
+import greenlet
+import time
+import datetime
+
+
+class Arrival(sim.Component):
+
+    def process(self):
+        global iat
+        global count
+        global warmup
+        global env
+
+        while True:
+            Service()
+            yield self.hold(sim.Exponential(10).sample())
+
+
+class Service(sim.Component):
+
+    global server1
+    global server2
+    global server3
+    global server4
+    global queue1
+    global queue2
+    global queue3
+    global queue4
+
+    def process(self):
+       # system 1
+        self.enter(queue1)
+        yield self.request(server1)
+        self.leave(queue1)
+        yield self.hold(sim.Uniform(3,7).sample())
+        self.release(server1)
+       # system 2
+        self.enter(queue2)
+        yield self.request(server2)
+        self.leave(queue2)
+        yield self.hold(sim.Uniform(3,7).sample())
+        self.release(server2)
+       # system 3
+        random = sim.Uniform(0,1).sample()
+        if random < 0.6:
+            self.enter(queue4)
+            yield self.request(server4)
+            self.leave(queue4)
+            yield self.hold(sim.Uniform(3, 7).sample())
+            self.release(server4)
+        # system 3
+        self.enter(queue3)
+        yield self.request(server3)
+        self.leave(queue3)
+        yield self.hold(sim.Uniform(3, 7).sample())
+        self.release(server3)
+
+
+
+def main():
+
+    util1 = []
+    util2 = []
+    util3 = []
+    util4 = []
+    run_time = []
+
+    global server1
+    global server2
+    global server3
+    global server4
+    global queue1
+    global queue2
+    global queue3
+    global queue4
+
+    for j in range(0, 30):
+
+        env = sim.Environment(trace=False,random_seed="",yieldless=False)
+
+        server1 = sim.Resource("Server 1", capacity=1)
+        server2 = sim.Resource("Server 2", capacity=1)
+        server3 = sim.Resource("Server 3", capacity=1)
+        server4 = sim.Resource("Server 4", capacity=1)
+
+        queue1 = sim.Queue(name="Queue 1")
+        queue2 = sim.Queue(name="Queue 2")
+        queue3 = sim.Queue(name="Queue 3")
+        queue4 = sim.Queue(name="Queue 4")
+
+        Arrival()
+        start_time = time.time()
+        runtime = 50000
+        env.run(runtime)
+        end_time = time.time()
+        util1.append(server1.occupancy.mean())
+        util2.append(server2.occupancy.mean())
+        util3.append(server3.occupancy.mean())
+        util4.append(server4.occupancy.mean())
+        print("Replication number {} done in time {}. ".format(j, (end_time-start_time)))
+        run_time.append(end_time-start_time)
+
+    df = pd.DataFrame({
+    'Server 1 utilisation': util1,
+    'Server 2 utilisation': util2,
+    'Server 3 utilisation': util3,
+    'Server 4 utilisation': util4,
+    'Run time': run_time})
+
+    # Write the DataFrame to an Excel file
+    excel_file_path = '.venv/Experiment3.xlsx'
+    df.to_excel(excel_file_path,index=False)
+
+
+if __name__ == '__main__':
+    sim.yieldless(False)
+    main()
